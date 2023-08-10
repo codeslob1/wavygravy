@@ -1,0 +1,43 @@
+[package]
+name = "wavygravy"
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+description = "High performance waveform displayer"
+homepage = ""
+repository = ""
+
+[lib]
+name = "wavygravy"
+crate-type = ["cdylib", "lib"]
+
+[[bin]]
+name = "wavygravy_bin"
+path = "src/main.rs"
+
+[dependencies]
+vello = { version = "0.0.1", path = "../vello", features = ["buffer_labels", "wgpu-profiler"] }
+anyhow = "1.0"
+clap = { version = "4.1.0", features = ["derive"] }
+instant = { version = "0.1.12", features = ["wasm-bindgen"] }
+pollster = "0.3.0"
+wgpu-profiler = "0.12.1"
+wgpu = "0.16"
+winit = "0.28.1"
+env_logger = "0.10.0"
+log = "0.4.17"
+num-format = "0.4"
+
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "android")))'.dependencies]
+vello = { version = "0.0.1", path = "../vello", features = ["hot_reload"] }
+notify-debouncer-mini = "0.3"
+
+[target.'cfg(target_os = "android")'.dependencies]
+winit = { version = "0.28", features = ["android-native-activity"] }
+android_logger = "0.13.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1.7"
+console_log = "1"
+wasm-bindgen-futures = "0.4.33"
+web-sys = { version = "0.3.60", features = [ "HtmlCollection", "Text" ] }
