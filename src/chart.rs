@@ -172,16 +172,9 @@ impl Chart {
         self.handle_click(&pos, width, height)
     }
 
-    /// Handle mouse wheel event, return true if handled
-    pub fn handle_mousewheel(&mut self, exponent: f64, _prior: &Vec2, _width: f64, _height: f64) -> bool {
-        //let mregion = self.get_mouse_region(prior, width, height);
-        //println!("mousewheel {} {},{} - region {:?}", exponent, prior.x, prior.y, mregion);
-        
-        let zoom_range = if exponent > 0. {
-            0.5 * (self.time_range[1] - self.time_range[0])
-        } else {
-            2.0 * (self.time_range[1] - self.time_range[0])
-        };
+    /// Change zoom (time window size) by `ratio`
+    pub fn do_zoom(&mut self, ratio: f64) {
+        let zoom_range = ratio * (self.time_range[1] - self.time_range[0]);
 
         if let Some(curs) = self.cursor {
             // Adjust zoom around cursor position
@@ -198,6 +191,18 @@ impl Chart {
         // Bounds check
         if self.time_range[0] < self.max_range[0] { self.time_range[0] = self.max_range[0] }
         if self.time_range[1] > self.max_range[1] { self.time_range[1] = self.max_range[1] }
+    }
+
+    /// Handle mouse wheel event, return true if handled
+    pub fn handle_mousewheel(&mut self, exponent: f64, _prior: &Vec2, _width: f64, _height: f64) -> bool {
+        //let mregion = self.get_mouse_region(prior, width, height);
+        //println!("mousewheel {} {},{} - region {:?}", exponent, prior.x, prior.y, mregion);
+        let zoom_ratio = if exponent > 0. {
+            0.5
+        } else {
+            2.0
+        };
+        self.do_zoom(zoom_ratio);
         true
     }
 

@@ -21,12 +21,13 @@ anyhow = "1.0"
 clap = { version = "4.1.0", features = ["derive"] }
 instant = { version = "0.1.12", features = ["wasm-bindgen"] }
 pollster = "0.3.0"
-wgpu-profiler = "0.12.1"
-wgpu = "0.16"
+wgpu-profiler = "0.13"
+wgpu = "0.17"
 winit = "0.28.1"
 env_logger = "0.10.0"
 log = "0.4.17"
 num-format = "0.4"
+nanorand = { version = "0.7", default-features = false, features = ["wyrand"] }
 
 [target.'cfg(not(any(target_arch = "wasm32", target_os = "android")))'.dependencies]
 vello = { version = "0.0.1", path = "../vello", features = ["hot_reload"] }

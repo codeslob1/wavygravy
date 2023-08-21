@@ -23,6 +23,7 @@ mod hot_reload;
 //mod multi_touch;
 mod stats;
 mod chart;
+mod face;
 mod sampler;
 use sampler::{Sampler, DigiSigGen, SineGen, AnaSigGen};
 mod datastore;
@@ -144,6 +145,8 @@ fn run(
     chart.set_max_range( &[0., 10000000000.], &TimeScale { time: 1., unit: TimeUnit::Ps });
     //chart.set_cursor(56789000. + 8000000.);
     let mut chart_shown = true;
+    let mut face = face::Face::new(5, 1000., 1000.);
+    let mut face_shown = false;
     // Currently not updated in wasm builds
     #[allow(unused_mut)]
     let mut scene_complexity: Option<BumpAllocators> = None;
@@ -199,8 +202,14 @@ fn run(
                             Some(VirtualKeyCode::S) => {
                                 stats_shown = !stats_shown;
                             }
-                            Some(VirtualKeyCode::D) => {
-                                complexity_shown = !complexity_shown;
+                            Some(VirtualKeyCode::F) => {
+                                face_shown = !face_shown;
+                            }
+                            Some(VirtualKeyCode::O) => {
+                                face.incr_star_points();
+                            }
+                            Some(VirtualKeyCode::P) => {
+                                face.decr_star_points();
                             }
                             Some(VirtualKeyCode::C) => {
                                 stats.clear_min_and_max();
@@ -238,6 +247,14 @@ fn run(
                                         wgpu::PresentMode::AutoNoVsync
                                     },
                                 );
+                            }
+                            Some(VirtualKeyCode::Plus) | Some(VirtualKeyCode::Equals) => {
+                                chart.do_zoom(1.1);
+                                render_state.window.request_redraw();
+                            }
+                            Some(VirtualKeyCode::Minus) => {
+                                chart.do_zoom(0.9);
+                                render_state.window.request_redraw();
                             }
                             Some(VirtualKeyCode::Escape) => {
                                 *control_flow = ControlFlow::Exit;
@@ -391,6 +408,14 @@ fn run(
                     height as f64,
                 );
             }
+            if face_shown {
+                face.draw_layer::<bool>(
+                    &mut builder,
+                    &mut simple_text,
+                    width as f64,
+                    height as f64,
+                );
+            }
             if stats_shown {
                 snapshot.draw_layer(
                     &mut builder,
@@ -421,6 +446,16 @@ fn run(
                     )
                 }
             }
+
+            let d = scene.data();
+            println!("scene: n_draw_tags {}, n_paths {}, n_path_segments {}, n_clips {}, n_open_clips {}", 
+                     d.draw_tags.len(),
+                     d.n_paths,
+                     d.n_path_segments,
+                     d.n_clips,
+                     d.n_open_clips,
+                     );
+
             let surface_texture = render_state
                 .surface
                 .surface
