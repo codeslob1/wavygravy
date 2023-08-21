@@ -1,6 +1,6 @@
 use vello::{
     kurbo::{Affine, /*Line,*/ PathEl, Rect},
-    peniko::{Brush, Color, Fill, Stroke},
+    peniko::{BlendMode, Brush, Color, Fill, Stroke},
     /*BumpAllocators,*/ SceneBuilder,
 };
 use crate::{
@@ -671,6 +671,15 @@ impl Chart {
             &Rect::new(x0, height - RULE_HEIGHT, x1, height),
         );
     
+        // Set clip region to waveform signals and labels
+        let blend : BlendMode = Default::default();
+        sb.push_layer(
+            blend,        // blend
+            1.,           // alpha
+            offset,       // transform
+            &Rect::new(0., RULE_HEIGHT, viewport_width, viewport_height - RULE_HEIGHT),  // shape
+        );
+
         //const SIGNAL_HEIGHT : f64 = 16.;
         let mut height_acc : f64 = 0.0;
         let num_signals = datas.get_num_signals();
@@ -697,6 +706,8 @@ impl Chart {
             };
             height_acc += signal_height;
         }
+
+        sb.pop_layer();
 
         // Cursor
         if let Some(curs) = self.cursor {
