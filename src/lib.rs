@@ -15,7 +15,7 @@ use vello::{BumpAllocators, RendererOptions/*, SceneFragment*/};
 
 use winit::{
     event_loop::{EventLoop, EventLoopBuilder},
-    window::Window,
+    window::{CursorIcon, Window},
 };
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
@@ -348,15 +348,12 @@ fn run(
                 }
                 WindowEvent::CursorMoved { position, .. } => {
                     let position = Vec2::new(position.x, position.y);
-                    if mouse_down {
-                        if let Some(prior) = prior_position {
-                        /*
-                            transform = Affine::translate(position - prior) * transform;
-                        */
-                            let width = render_state.surface.config.width;
-                            let height = render_state.surface.config.height;
-                            chart.handle_mousemove(&position, &prior, width as f64, height as f64);
-                        }
+                    let width = render_state.surface.config.width;
+                    let height = render_state.surface.config.height;
+                    let (handled, mcurs) = chart.handle_mousemove(&position, &prior_position, width as f64, height as f64, mouse_down);
+                    match mcurs {
+                        chart::MouseCursor::Normal => { render_state.window.set_cursor_icon(CursorIcon::Default); }
+                        chart::MouseCursor::Column => { render_state.window.set_cursor_icon(CursorIcon::Grab); }
                     }
                     prior_position = Some(position);
                 }
@@ -447,6 +444,7 @@ fn run(
                 }
             }
 
+/*
             let d = scene.data();
             println!("scene: n_draw_tags {}, n_paths {}, n_path_segments {}, n_clips {}, n_open_clips {}", 
                      d.draw_tags.len(),
@@ -455,6 +453,7 @@ fn run(
                      d.n_clips,
                      d.n_open_clips,
                      );
+*/
 
             let surface_texture = render_state
                 .surface

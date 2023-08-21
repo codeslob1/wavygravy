@@ -23,12 +23,25 @@ const XSCRLCURS_COL : Brush = Brush::Solid(Color::RED);
 const RULE_HEIGHT : f64 = 16.;
 const SCROLL_WIDTH : f64 = 16.;
 
+/// How close (in pixels) we have to be to grab column header adjustment
+const COLHDR_REACH : f64 = 10.;
+const COLWIDTH_MIN : f64 = 16.;
+const SIGWIDTH_MIN : f64 = 32.;
+
 #[derive(Debug)]
 enum MouseRegion {
     None,
     Waveform,
     YScrollBar,
     XScrollRuler,
+    ColSignameHdr,
+    ColValueHdr,
+}
+
+#[derive(Debug)]
+pub enum MouseCursor {
+    Normal,
+    Column,
 }
 
 #[derive(Debug)]
@@ -91,6 +104,22 @@ impl Chart {
         }
     }
 
+    fn is_signame_region(&self, pos: &Vec2, width: f64, height: f64) -> bool {
+        if pos.y <= RULE_HEIGHT {
+            let col_signame_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame);
+            let dist_signame = (pos.x - col_signame_x).abs();
+            dist_signame < COLHDR_REACH
+        } else { false }
+    }
+
+    fn is_value_region(&self, pos: &Vec2, width: f64, height: f64) -> bool {
+        if pos.y <= RULE_HEIGHT {
+            let col_value_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame + self.col_value);
+            let dist_value = (pos.x - col_value_x).abs();
+            dist_value < COLHDR_REACH
+        } else { false }
+    }
+
     /// Calculate mouse region from current position
     fn get_mouse_region(&self, pos: &Vec2, width: f64, height: f64) -> MouseRegion {
         let sig_xoffs : f64 = (width - SCROLL_WIDTH) * (self.col_signame + self.col_value);
@@ -99,6 +128,14 @@ impl Chart {
         // Scroll bar region
         if pos.x >= width - SCROLL_WIDTH {
             MouseRegion::YScrollBar
+
+        // Column header (top ruler): signame
+        } else if self.is_signame_region(pos, width, height) {
+            MouseRegion::ColSignameHdr
+
+        // Column header (top ruler): value
+        } else if self.is_value_region(pos, width, height) {
+            MouseRegion::ColValueHdr
 
         // Bottom ruler (scroll) region
         } else if pos.y >= height - RULE_HEIGHT {
@@ -139,8 +176,36 @@ impl Chart {
         true
     }
 
+    fn handle_colhdr_click(&mut self, pos: &Vec2, width: f64, _height: f64) -> bool {
+        let frac = pos.x / width;
+        match self.mregion {
+            MouseRegion::ColSignameHdr => {
+                let new_colsigname = if frac * width > COLWIDTH_MIN { frac } else { COLWIDTH_MIN / width };
+                self.col_signame = new_colsigname;
+                true
+            }
+            MouseRegion::ColValueHdr => {
+                let new_colvalue = if (frac - self.col_signame) * width > COLWIDTH_MIN {
+                    if (1. - frac) * width > SIGWIDTH_MIN {
+                        frac - self.col_signame
+                    } else {
+                        1. - (self.col_signame + SIGWIDTH_MIN / width)
+                    }
+                } else {
+                    COLWIDTH_MIN / width
+                };
+                println!("frac {:.2}, col_signame {:.2}, col_value {:.2}, new {:.2}", frac, self.col_signame, self.col_value, new_colvalue);
+                self.col_value = new_colvalue;
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn handle_click(&mut self, pos: &Vec2, width: f64, height: f64) -> bool {
         match self.mregion {
+            MouseRegion::ColSignameHdr => self.handle_colhdr_click(pos, width, height),
+            MouseRegion::ColValueHdr => self.handle_colhdr_click(pos, width, height),
             MouseRegion::YScrollBar => false,
             MouseRegion::XScrollRuler => self.handle_xscroll_click(pos, width, height),
             MouseRegion::Waveform => self.handle_wave_click(pos, width, height),
@@ -151,13 +216,16 @@ impl Chart {
     /// Handle mouse down event, return true if handled
     pub fn handle_mousedown(&mut self, prior: &Option<Vec2>, width: f64, height: f64) -> bool {
         if let Some(pos) = prior {
-            let sig_xoffs : f64 = (width - SCROLL_WIDTH) * (self.col_signame + self.col_value);
+            let col_signame_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame);
+            let col_value_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame + self.col_value);
+            let sig_xoffs : f64 = col_value_x;
             let sig_width : f64 = (width - SCROLL_WIDTH) - sig_xoffs;
 
             self.mregion = self.get_mouse_region(pos, width, height);
             println!("mousedown {},{} - {},{}, region {:?}", pos.x, pos.y, sig_xoffs, sig_xoffs+sig_width, self.mregion);
 
-            self.handle_click(&pos, width, height)
+            let handled = self.handle_click(&pos, width, height); 
+            handled
         } else { false }
     }
 
@@ -167,9 +235,23 @@ impl Chart {
     }
 
     /// Handle mouse move event, return true if handled
-    pub fn handle_mousemove(&mut self, pos: &Vec2, _prior: &Vec2, width: f64, height: f64) -> bool {
-        println!("mousemove {},{} - region {:?}", pos.x, pos.y, self.mregion);
-        self.handle_click(&pos, width, height)
+    pub fn handle_mousemove(&mut self, pos: &Vec2, prior: &Option<Vec2>, width: f64, height: f64, mouse_down: bool) 
+        -> (bool, MouseCursor)
+    {
+        //println!("mousemove {},{} - region {:?}", pos.x, pos.y, self.mregion);
+        let col_signame_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame);
+        let col_value_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame + self.col_value);
+        let sig_xoffs : f64 = col_value_x;
+        let sig_width : f64 = (width - SCROLL_WIDTH) - sig_xoffs;
+
+        let mcurs : MouseCursor = if pos.y <= RULE_HEIGHT && 
+            (self.is_signame_region(pos, width, height) || self.is_value_region(pos, width, height))
+        {
+            MouseCursor::Column
+        } else { MouseCursor::Normal };
+
+        let handled = if mouse_down { self.handle_click(&pos, width, height) } else { false };
+        (handled, mcurs)
     }
 
     /// Change zoom (time window size) by `ratio`
@@ -328,6 +410,40 @@ impl Chart {
             Color::LIGHT_GRAY,
             None,
             &hline,
+        );
+    }
+
+    /// Draw column headers at top of waveform window
+    pub fn draw_colhdr(
+        &self,
+        sb: &mut SceneBuilder,
+        text: &mut SimpleText,
+        width: f64,
+        _height: f64,
+        offset: Affine,
+    )
+    {
+        use PathEl::*;
+        // Column header bars
+        let marker_long = [
+            MoveTo((0., 0.).into()),
+            LineTo((0., RULE_HEIGHT).into()),
+        ];
+        let col_signame_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame);
+        sb.stroke(
+            &Stroke::new((2.0) as f32),
+            offset * Affine::translate((col_signame_x, 0.)),
+            Color::YELLOW,
+            None,
+            &marker_long,
+        );
+        let col_value_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame + self.col_value);
+        sb.stroke(
+            &Stroke::new((2.0) as f32),
+            offset * Affine::translate((col_value_x, 0.)),
+            Color::YELLOW,
+            None,
+            &marker_long,
         );
     }
 
@@ -756,6 +872,9 @@ impl Chart {
                 &vline,
             );
         }
+
+        // Column headers
+        self.draw_colhdr(sb, text, width, height, offset);
 
         // Y scrollbar
         self.draw_yscroll(sb, text, width, height, offset);
