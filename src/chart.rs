@@ -183,9 +183,9 @@ impl Chart {
                 let new_colsigname = if frac * width > COLWIDTH_MIN {
                     if (1. - (frac + self.col_value)) * width > SIGWIDTH_MIN {
                         frac
-                    } else { print!("boo --> "); 1. - (self.col_value + SIGWIDTH_MIN / width) }
+                    } else { 1. - (self.col_value + SIGWIDTH_MIN / width) }
                 } else { COLWIDTH_MIN / width };
-                println!("signame frac {:.2}, col_signame {:.2}, col_value {:.2}, new {:.2}", frac, self.col_signame, self.col_value, new_colsigname);
+                //println!("signame frac {:.2}, col_signame {:.2}, col_value {:.2}, new {:.2}", frac, self.col_signame, self.col_value, new_colsigname);
                 self.col_signame = new_colsigname;
                 true
             }
@@ -199,7 +199,7 @@ impl Chart {
                 } else {
                     COLWIDTH_MIN / width
                 };
-                println!("value frac {:.2}, col_signame {:.2}, col_value {:.2}, new {:.2}", frac, self.col_signame, self.col_value, new_colvalue);
+                //println!("value frac {:.2}, col_signame {:.2}, col_value {:.2}, new {:.2}", frac, self.col_signame, self.col_value, new_colvalue);
                 self.col_value = new_colvalue;
                 true
             }
@@ -227,7 +227,7 @@ impl Chart {
             let sig_width : f64 = (width - SCROLL_WIDTH) - sig_xoffs;
 
             self.mregion = self.get_mouse_region(pos, width, height);
-            println!("mousedown {},{} - {},{}, region {:?}", pos.x, pos.y, sig_xoffs, sig_xoffs+sig_width, self.mregion);
+            println!("mousedown {:.0},{:.0} - {:.0},{:.0}, region {:?}", pos.x, pos.y, sig_xoffs, sig_xoffs+sig_width, self.mregion);
 
             let handled = self.handle_click(&pos, width, height); 
             handled
