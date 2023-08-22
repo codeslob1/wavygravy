@@ -180,7 +180,12 @@ impl Chart {
         let frac = pos.x / width;
         match self.mregion {
             MouseRegion::ColSignameHdr => {
-                let new_colsigname = if frac * width > COLWIDTH_MIN { frac } else { COLWIDTH_MIN / width };
+                let new_colsigname = if frac * width > COLWIDTH_MIN {
+                    if (1. - (frac + self.col_value)) * width > SIGWIDTH_MIN {
+                        frac
+                    } else { print!("boo --> "); 1. - (self.col_value + SIGWIDTH_MIN / width) }
+                } else { COLWIDTH_MIN / width };
+                println!("signame frac {:.2}, col_signame {:.2}, col_value {:.2}, new {:.2}", frac, self.col_signame, self.col_value, new_colsigname);
                 self.col_signame = new_colsigname;
                 true
             }
@@ -194,7 +199,7 @@ impl Chart {
                 } else {
                     COLWIDTH_MIN / width
                 };
-                println!("frac {:.2}, col_signame {:.2}, col_value {:.2}, new {:.2}", frac, self.col_signame, self.col_value, new_colvalue);
+                println!("value frac {:.2}, col_signame {:.2}, col_value {:.2}, new {:.2}", frac, self.col_signame, self.col_value, new_colvalue);
                 self.col_value = new_colvalue;
                 true
             }
