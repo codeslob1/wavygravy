@@ -1,6 +1,0 @@
-"ID", Timestamp, Transaction Type, Target#, Data Interface, Opcode
-0, 0 s, "Block Erase Multi-plane", 0, NV-DDR 2/3, 0x60, 0x1C2000, 0xD1
-1, 410 ns, "Block Erase Multi-plane", 0, NV-DDR 2/3, 0x60, 0x1C2800, 0xD1
-2, 850 ns, "Block Erase Multi-plane", 0, NV-DDR 2/3, 0x60, 0x1C3000, 0xD1
-3, 1.290 us, "Block Erase", 0, NV-DDR 2/3, 0x60, 0x1C3800, 0xD0
-4, 12.613252 ms, "Enhanced Read Status (Multiplane)", 0, NV-DDR 2/3, 0x7A
