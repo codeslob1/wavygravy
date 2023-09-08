@@ -1,8 +1,7 @@
 #![feature(return_position_impl_trait_in_trait)]
 
 use instant::{Duration, Instant};
-
-use anyhow::Result;
+use std::path::PathBuf;
 use clap::{/*CommandFactory,*/ Parser};
 use vello::peniko::Color;
 use vello::util::RenderSurface;
@@ -19,75 +18,34 @@ use winit::{
 };
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+mod times;
+use times::*;
 mod hot_reload;
-//mod multi_touch;
 mod stats;
 mod chart;
 mod face;
 mod sampler;
-use sampler::{Sampler, DigiSigGen, SineGen, AnaSigGen};
+use sampler::{AnaSigGen, DigiSig, DigiSigGen, Sampler, SineGen};
 mod datastore;
-use datastore::{DataStore};
+use datastore::{DataStore, FileType};
 mod simple_text;
 use simple_text::SimpleText;
 
-const HEIGHT_DIGITAL : f64 = 16.;
-const HEIGHT_ANALOG  : f64 = 32.;
+const GUI_SCALE      : f64 = 1.5;
+const RULE_HEIGHT    : f64 = GUI_SCALE * 16.;
+const SCROLL_WIDTH   : f64 = GUI_SCALE * 16.;
+const HEIGHT_DIGITAL : f64 = GUI_SCALE * 16.;
+const HEIGHT_ANALOG  : f64 = GUI_SCALE * 32.;
 
-#[derive(Debug, Clone, Copy)]
-pub enum TimeUnit {
-    Fs,
-    Ps,
-    Ns,
-    Us,
-    Ms,
-    S,
-}
-
-impl std::fmt::Display for TimeUnit {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let s = match self {
-            TimeUnit::Fs => "fs",
-            TimeUnit::Ps => "ps",
-            TimeUnit::Ns => "ns",
-            TimeUnit::Us => "us",
-            TimeUnit::Ms => "ms",
-            TimeUnit::S  => "s",
-        };
-        f.write_str(s)
-    }
-}
-
-type Time = f64;
-
-#[derive(Debug, Clone, Copy)]
-pub struct TimeScale {
-    pub time: Time,
-    pub unit: TimeUnit,
-}
-
-/// Format time string
-pub fn fmt_time(t: Time) -> String {
-    use num_format::{Buffer, Locale/*, WriteFormatted*/};
-    // Create a stack-allocated buffer...
-    let mut buf = Buffer::default();
-    let n = t.round() as u64;
-    buf.write_formatted(&n, &Locale::en);
-    buf.as_str().to_string()
-}
-
-/// Format time string with scale (units)
-pub fn fmt_time_unit(ts: TimeScale) -> String {
-    use num_format::{Buffer, Locale/*, WriteFormatted*/};
-    let mut buf = Buffer::default();
-    let n = ts.time.round() as u64;
-    buf.write_formatted(&n, &Locale::en);
-    format!("{} {}", buf.as_str().to_string(), ts.unit)
-}
+pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Parser, Debug)]
-#[command(about, long_about = None, bin_name="cargo run -p with_winit --")]
+#[command(about, long_about = None, bin_name="cargo run -p wavygravy")]
 struct Args {
+    paths: Vec<PathBuf>,
+
+    #[arg(short = 't')]
+    test: bool,
 }
 
 struct RenderState {
@@ -99,9 +57,29 @@ struct RenderState {
 
 fn run(
     event_loop: EventLoop<UserEvent>,
+    args: Args,
     render_cx: RenderContext,
     #[cfg(target_arch = "wasm32")] render_state: RenderState,
 ) {
+    // Drawing timescale (may affect minimum waveform display resoltion)
+    let /*mut*/ timescale = TimeScale { time: 1., unit: TimeUnit::Ps };
+
+    println!("args {:?}", args);
+    let mut datas : DataStore = if args.test {
+        DataStore::new_test(timescale)
+    } else {
+        let mut datas = DataStore::new(timescale);
+        for path in args.paths {
+            let res = datas.load_wave(path.clone(), FileType::TryAny);
+            if let Err(e) = res {
+                let paths = path.display();
+                eprintln!("Unable to load wave {paths}: {e}");
+                return;
+            }
+        }
+        datas
+    };
+
     use winit::{event::*, event_loop::ControlFlow};
     let mut renderers: Vec<Option<Renderer>> = vec![];
     #[cfg(not(target_arch = "wasm32"))]
@@ -133,24 +111,26 @@ fn run(
     #[cfg(not(target_arch = "wasm32"))]
     let mut cached_window = None;
 
-    let mut datas : DataStore = DataStore::new_test();
-
     let mut scene = Scene::new();
     //let mut fragment = SceneFragment::new();
     let mut simple_text = SimpleText::new();
     let mut stats = stats::Stats::new();
     let mut stats_shown = false;
+
     let mut chart = chart::Chart::new();
-    chart.set_range( &[0., 200000000.], &TimeScale { time: 1., unit: TimeUnit::Ps });
-    chart.set_max_range( &[0., 10000000000.], &TimeScale { time: 1., unit: TimeUnit::Ps });
+    let (tstart, tend) = datas.get_range();
+    chart.set_range( &[tstart, tstart+0.1*(tend-tstart)], &timescale);
+    chart.set_max_range( &[tstart, tend], &TimeScale { time: 1., unit: TimeUnit::Ps });
     //chart.set_cursor(56789000. + 8000000.);
     let mut chart_shown = true;
+    
     let mut face = face::Face::new(5, 1000., 1000.);
     let mut face_shown = false;
+    
     // Currently not updated in wasm builds
     #[allow(unused_mut)]
     let mut scene_complexity: Option<BumpAllocators> = None;
-    let mut complexity_shown = false;
+    let /*mut*/ complexity_shown = true;
     let mut vsync_on = true;
     let mut frame_start_time = Instant::now();
     //let start = Instant::now();
@@ -205,10 +185,10 @@ fn run(
                             Some(VirtualKeyCode::F) => {
                                 face_shown = !face_shown;
                             }
-                            Some(VirtualKeyCode::O) => {
+                            Some(VirtualKeyCode::K) => {
                                 face.incr_star_points();
                             }
-                            Some(VirtualKeyCode::P) => {
+                            Some(VirtualKeyCode::L) => {
                                 face.decr_star_points();
                             }
                             Some(VirtualKeyCode::C) => {
@@ -249,11 +229,11 @@ fn run(
                                 );
                             }
                             Some(VirtualKeyCode::Plus) | Some(VirtualKeyCode::Equals) => {
-                                chart.do_zoom(1.1);
+                                chart.do_zoom(0.9);
                                 render_state.window.request_redraw();
                             }
                             Some(VirtualKeyCode::Minus) => {
-                                chart.do_zoom(0.9);
+                                chart.do_zoom(1.1);
                                 render_state.window.request_redraw();
                             }
                             Some(VirtualKeyCode::Escape) => {
@@ -350,7 +330,7 @@ fn run(
                     let position = Vec2::new(position.x, position.y);
                     let width = render_state.surface.config.width;
                     let height = render_state.surface.config.height;
-                    let (handled, mcurs) = chart.handle_mousemove(&position, &prior_position, width as f64, height as f64, mouse_down);
+                    let (_handled, mcurs) = chart.handle_mousemove(&position, &prior_position, width as f64, height as f64, mouse_down);
                     match mcurs {
                         chart::MouseCursor::Normal => { render_state.window.set_cursor_icon(CursorIcon::Default); }
                         chart::MouseCursor::Column => { render_state.window.set_cursor_icon(CursorIcon::Grab); }
@@ -571,7 +551,7 @@ fn create_window(event_loop: &winit::event_loop::EventLoopWindowTarget<UserEvent
     WindowBuilder::new()
         .with_inner_size(LogicalSize::new(1044, 800))
         .with_resizable(true)
-        .with_title("Vello demo")
+        .with_title("Wavygravy")
         .build(event_loop)
         .unwrap()
 }
@@ -608,7 +588,7 @@ pub fn main() -> Result<()> {
     // Figure out a more principled approach.
     #[cfg(not(target_arch = "wasm32"))]
     env_logger::init();
-    //let args = Args::parse();
+    let args = Args::parse();
     let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
     #[allow(unused_mut)]
     let mut render_cx = RenderContext::new().unwrap();
@@ -621,7 +601,7 @@ pub fn main() -> Result<()> {
             proxy.send_event(UserEvent::HotReload).ok().map(drop)
         });
 
-        run(event_loop, render_cx);
+        run(event_loop, args, render_cx);
     }
     #[cfg(target_arch = "wasm32")]
     {

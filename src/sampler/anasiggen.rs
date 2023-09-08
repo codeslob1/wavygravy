@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use crate::{Sampler, Time, TimeUnit, TimeScale};
+use crate::{Result, Sampler, TimeRel, TimeUnit, TimeScale};
 
 #[derive(Debug)]
 enum SigGenType<T> {
@@ -20,7 +20,7 @@ impl AnaSigGen {
         AnaSigGen {
             sig: idx,
             stype: SigGenType::Fixed(height),
-            scale: TimeScale { time: 1., unit: TimeUnit::Fs },
+            scale: Default::default(),
         }
     }
 
@@ -28,7 +28,7 @@ impl AnaSigGen {
         AnaSigGen {
             sig: idx,
             stype: SigGenType::Pulse(off, on, start, end, repeat),
-            scale: TimeScale { time: 1., unit: TimeUnit::Fs },
+            scale: Default::default(),
         }
     }
 }
@@ -49,7 +49,7 @@ impl Sampler<f32> for AnaSigGen {
         format!("analog_{}", self.sig)
     }
 
-    fn iter_range(&self, range: &[f64; 2]) -> Box<dyn Iterator<Item = (f32, Time)> + '_> {
+    fn iter_range(&self, range: &[f64; 2]) -> Result<Box<dyn Iterator<Item = (f32, TimeRel)> + '_>> {
         let iter = Box::new(AnaSigIter {
             smpl: self,
             pos: range[0]-f64::EPSILON,
@@ -58,10 +58,10 @@ impl Sampler<f32> for AnaSigGen {
             phantom: PhantomData,
         });
         //println!("iter_range: {:?}", iter);
-        iter
+        Ok(iter)
     }
 
-    fn get_value_at(&self, t: Time, _s: TimeScale) -> f32 {
+    fn get_value_at(&self, t: TimeRel, _s: TimeScale) -> f32 {
         match self.stype {
             SigGenType::Fixed(height) => height,
             SigGenType::Pulse(off, on, start, end, repeat) => {
@@ -97,14 +97,14 @@ impl Sampler<f32> for AnaSigGen {
 #[derive(Debug)]
 pub struct AnaSigIter<'r, T> {
     smpl: &'r AnaSigGen,
-    pos: Time,
-    range: [Time; 2],
+    pos: TimeRel,
+    range: [TimeRel; 2],
     done: bool,
     phantom: PhantomData<T>,
 }
 
 impl AnaSigIter<'_, f32> {
-    fn next_pulse(&mut self, off: f32, on: f32, start: f64, end: f64, repeat: f64) -> Option<(f32, Time)> {
+    fn next_pulse(&mut self, off: f32, on: f32, start: f64, end: f64, repeat: f64) -> Option<(f32, TimeRel)> {
         if self.done { return None }
 
         if self.pos < start {
@@ -135,7 +135,7 @@ impl AnaSigIter<'_, f32> {
 }
 
 impl Iterator for AnaSigIter<'_, f32> {
-    type Item = (f32, Time);
+    type Item = (f32, TimeRel);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.smpl.stype {

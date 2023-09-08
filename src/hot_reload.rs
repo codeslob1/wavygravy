@@ -1,6 +1,6 @@
 use std::{path::Path, time::Duration};
 
-use anyhow::Result;
+use crate::Result;
 use notify_debouncer_mini::{new_debouncer, notify::*, DebounceEventResult};
 
 pub(crate) fn hot_reload(mut f: impl FnMut() -> Option<()> + Send + 'static) -> Result<impl Sized> {

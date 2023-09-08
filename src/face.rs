@@ -10,16 +10,6 @@ use crate::{
 use std::f64::consts::PI;
 
 const BG_COL : Brush = Brush::Solid(Color::rgba8(0, 0, 0, 255));
-const WVLO_COL : Brush = Brush::Solid(Color::rgba8(0, 0, 200, 255));
-const WVHI_COL : Brush = Brush::Solid(Color::rgba8(0, 100, 200, 255));
-const WVDN_COL : Brush = Brush::Solid(Color::rgba8(100, 0, 200, 255));
-const WVUP_COL : Brush = Brush::Solid(Color::rgba8(100, 100, 200, 255));
-const WVANA_COL : Brush = Brush::Solid(Color::rgba8(255, 100, 0, 255));
-const YSCRLBOX_COL : Brush = Brush::Solid(Color::rgba8(200, 0, 200, 255));
-const YSCRLARR_COL : Brush = Brush::Solid(Color::rgba8(0, 0, 0, 255));
-const XSCRLLOC_COL : Brush = Brush::Solid(Color::rgba8(0, 180, 0, 180));
-const CURS_COL : Brush = Brush::Solid(Color::YELLOW);
-const XSCRLCURS_COL : Brush = Brush::Solid(Color::RED);
 
 const NUM_LINES : usize = 5000;
 
@@ -86,9 +76,9 @@ pub struct Face {
     rays_init: usize,
 }
 
-fn print_type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>())
-}
+//fn print_type_of<T>(_: &T) {
+//    println!("{}", std::any::type_name::<T>())
+//}
 
 fn n_pointed_star(num_points: usize, width: f64, height: f64) -> BezPath {
     let x_mid = width / 2.;
@@ -111,8 +101,8 @@ fn n_pointed_star(num_points: usize, width: f64, height: f64) -> BezPath {
 }
 
 impl Face {
-    pub fn new(star_points: usize, width: f64, height: f64) -> Self {
-        let mut rng = WyRand::new();
+    pub fn new(star_points: usize, _width: f64, _height: f64) -> Self {
+        let rng = WyRand::new();
         Self {
             xscale : 2./3.,
             yscale : 2./3.,
@@ -125,6 +115,7 @@ impl Face {
         }
     }
 
+    #[allow(dead_code)]
     pub fn set_num_star_points(&mut self, num_points: usize) {
         self.star_points = num_points;
     }
@@ -142,8 +133,8 @@ impl Face {
 
     fn draw_ray(&mut self,
         sb: &mut SceneBuilder,
-        width: f64,
-        height: f64,
+        _width: f64,
+        _height: f64,
         offset: Affine,
         idx: usize,
     )
@@ -174,7 +165,7 @@ impl Face {
     pub fn draw_layer<'a, T>(
         &mut self,
         sb: &mut SceneBuilder,
-        text: &mut SimpleText,
+        _text: &mut SimpleText,
         viewport_width: f64,
         viewport_height: f64,
     )
@@ -213,7 +204,6 @@ impl Face {
             &clip_shape,  // shape
         );
 
-        const BGCOL : Brush = Brush::Solid(Color::rgba8(0, 0, 0, 255));
         // Draw the background
         sb.fill(
             Fill::NonZero,

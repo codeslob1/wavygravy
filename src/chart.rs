@@ -1,11 +1,14 @@
+use std::cell::{RefCell, RefMut};
+
 use vello::{
     kurbo::{Affine, /*Line,*/ PathEl, Rect},
     peniko::{BlendMode, Brush, Color, Fill, Stroke},
     /*BumpAllocators,*/ SceneBuilder,
 };
 use crate::{
-    Time, TimeUnit, TimeScale, Vec2,
+    TimeRel, TimeUnit, TimeScale, Vec2,
     Sampler, DataStore, SimpleText,
+    RULE_HEIGHT, SCROLL_WIDTH,
 };
 
 const BG_COL : Brush = Brush::Solid(Color::rgba8(0, 0, 0, 255));
@@ -19,9 +22,6 @@ const YSCRLARR_COL : Brush = Brush::Solid(Color::rgba8(0, 0, 0, 255));
 const XSCRLLOC_COL : Brush = Brush::Solid(Color::rgba8(0, 180, 0, 180));
 const CURS_COL : Brush = Brush::Solid(Color::YELLOW);
 const XSCRLCURS_COL : Brush = Brush::Solid(Color::RED);
-
-const RULE_HEIGHT : f64 = 16.;
-const SCROLL_WIDTH : f64 = 16.;
 
 /// How close (in pixels) we have to be to grab column header adjustment
 const COLHDR_REACH : f64 = 10.;
@@ -46,12 +46,12 @@ pub enum MouseCursor {
 
 #[derive(Debug)]
 pub struct Chart {
-    pub time_range: [Time; 2],
+    pub time_range: [TimeRel; 2],
     pub time_scale: TimeScale,
-    pub max_range: [Time; 2],
+    pub max_range: [TimeRel; 2],
     pub col_signame : f64,
     pub col_value : f64,
-    pub cursor: Option<Time>,
+    pub cursor: Option<TimeRel>,
     mregion: MouseRegion,
 }
 
@@ -79,6 +79,7 @@ impl Chart {
     }
 
     pub fn set_cursor(&mut self, t: f64) {
+        println!("set_cursor({})", t);
         self.cursor = Some(t);
     }
 
@@ -88,12 +89,12 @@ impl Chart {
     }
 
     /// Convert time to screen x position
-    pub fn time_to_xpos(&self, t: Time, range: &[Time; 2], sig_xoffs: f64, sig_width: f64) -> f64 {
+    pub fn time_to_xpos(&self, t: TimeRel, range: &[TimeRel; 2], sig_xoffs: f64, sig_width: f64) -> f64 {
         sig_xoffs + sig_width * (t - range[0]) / (range[1] - range[0])
     }
 
     /// Convert screen x position to time, clipping to range bounds
-    pub fn xpos_to_time(&self, x: f64, range: &[Time; 2], sig_xoffs: f64, sig_width: f64) -> Time {
+    pub fn xpos_to_time(&self, x: f64, range: &[TimeRel; 2], sig_xoffs: f64, sig_width: f64) -> TimeRel {
         let t = (x - sig_xoffs) * (range[1] - range[0]) / sig_width + range[0];
         if t < range[0] {
             range[0]
@@ -104,7 +105,7 @@ impl Chart {
         }
     }
 
-    fn is_signame_region(&self, pos: &Vec2, width: f64, height: f64) -> bool {
+    fn is_signame_region(&self, pos: &Vec2, width: f64, _height: f64) -> bool {
         if pos.y <= RULE_HEIGHT {
             let col_signame_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame);
             let dist_signame = (pos.x - col_signame_x).abs();
@@ -112,7 +113,7 @@ impl Chart {
         } else { false }
     }
 
-    fn is_value_region(&self, pos: &Vec2, width: f64, height: f64) -> bool {
+    fn is_value_region(&self, pos: &Vec2, width: f64, _height: f64) -> bool {
         if pos.y <= RULE_HEIGHT {
             let col_value_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame + self.col_value);
             let dist_value = (pos.x - col_value_x).abs();
@@ -221,7 +222,7 @@ impl Chart {
     /// Handle mouse down event, return true if handled
     pub fn handle_mousedown(&mut self, prior: &Option<Vec2>, width: f64, height: f64) -> bool {
         if let Some(pos) = prior {
-            let col_signame_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame);
+            //let col_signame_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame);
             let col_value_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame + self.col_value);
             let sig_xoffs : f64 = col_value_x;
             let sig_width : f64 = (width - SCROLL_WIDTH) - sig_xoffs;
@@ -240,14 +241,14 @@ impl Chart {
     }
 
     /// Handle mouse move event, return true if handled
-    pub fn handle_mousemove(&mut self, pos: &Vec2, prior: &Option<Vec2>, width: f64, height: f64, mouse_down: bool) 
+    pub fn handle_mousemove(&mut self, pos: &Vec2, _prior: &Option<Vec2>, width: f64, height: f64, mouse_down: bool) 
         -> (bool, MouseCursor)
     {
         //println!("mousemove {},{} - region {:?}", pos.x, pos.y, self.mregion);
-        let col_signame_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame);
-        let col_value_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame + self.col_value);
-        let sig_xoffs : f64 = col_value_x;
-        let sig_width : f64 = (width - SCROLL_WIDTH) - sig_xoffs;
+        //let col_signame_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame);
+        //let col_value_x : f64 = (width - SCROLL_WIDTH) * (self.col_signame + self.col_value);
+        //let sig_xoffs : f64 = col_value_x;
+        //let sig_width : f64 = (width - SCROLL_WIDTH) - sig_xoffs;
 
         let mcurs : MouseCursor = if pos.y <= RULE_HEIGHT && 
             (self.is_signame_region(pos, width, height) || self.is_value_region(pos, width, height))
@@ -305,7 +306,7 @@ impl Chart {
         rule_height: f64,
         x_offs: f64,
         y_offs: f64,
-        range: &[Time; 2],
+        range: &[TimeRel; 2],
         scale: &TimeScale
     )
     {
@@ -348,6 +349,8 @@ impl Chart {
         let range_per_pix = time_range / width;
         let mut xv = range[0] * scale.time;
         let mut xv_prev = xv - range_per_pix;
+
+        //print!("draw_ruler {}-{}: ", range[0], range[1]);
         
         let textwidth = 64; // Estimate - calculate properly from font
         let mut last_str_xpos : i32 = 0 - textwidth;
@@ -371,6 +374,7 @@ impl Chart {
                 let marker_ref = if xv_major {
                     if xpos - last_str_xpos > textwidth {
                         let label = crate::fmt_time(xv_step_round); //self.time_range[0] * self.time_scale.time);
+                        //print!(" {}[{}]", xv_step_round, label);
                         text.add(
                             sb,
                             None,
@@ -422,7 +426,7 @@ impl Chart {
     pub fn draw_colhdr(
         &self,
         sb: &mut SceneBuilder,
-        text: &mut SimpleText,
+        _text: &mut SimpleText,
         width: f64,
         _height: f64,
         offset: Affine,
@@ -453,6 +457,7 @@ impl Chart {
     }
 
     /// Draw individual digital waveform at a specific location
+    #[inline(never)]
     pub fn draw_digital(
         &self,
         sb: &mut SceneBuilder,
@@ -463,7 +468,7 @@ impl Chart {
         label_height: f32,
         signal_height: f64,
         y_offs : f64,
-        smpl: Box<dyn Sampler<bool>>,
+        smpl: RefMut<dyn Sampler<bool>>,
     )
     {
         use PathEl::*;
@@ -496,7 +501,7 @@ impl Chart {
         let mut curtime = self.time_range[0];
         let y_hi : f64 = y_offs + 2.;
         let y_lo : f64 = y_offs + signal_height - 1.;
-        for (nxval, nxtime) in smpl.iter_range(&self.time_range) {
+        for (nxval, nxtime) in smpl.iter_range(&self.time_range).unwrap() {
             let x_cur = self.time_to_xpos(curtime, &self.time_range, sig_xoffs, sig_width);
             let x_nxt = self.time_to_xpos(nxtime, &self.time_range, sig_xoffs, sig_width);
             //print!("{} ({},{},{}) -> {},{} ", curtime, curval, nxval, nxtime, x_cur, x_nxt);
@@ -590,6 +595,7 @@ impl Chart {
     }
 
     /// Draw individual analog waveform at a specific location
+    #[inline(never)]
     pub fn draw_analog(
         &self,
         sb: &mut SceneBuilder,
@@ -600,7 +606,7 @@ impl Chart {
         label_height: f32,
         signal_height: f64,
         y_offs : f64,
-        smpl: Box<dyn Sampler<f32>>,
+        smpl: RefMut<dyn Sampler<f32>>,
     )
     {
         use PathEl::*;
@@ -638,7 +644,7 @@ impl Chart {
         
         let mut curval = smpl.get_value_at(self.time_range[0], self.time_scale);
         let mut curtime = self.time_range[0];
-        for (nxval, nxtime) in smpl.iter_range(&self.time_range) {
+        for (nxval, nxtime) in smpl.iter_range(&self.time_range).unwrap() {
             let x_cur = self.time_to_xpos(curtime, &self.time_range, sig_xoffs, sig_width);
             let x_nxt = self.time_to_xpos(nxtime, &self.time_range, sig_xoffs, sig_width);
             let y_cur = value_to_ypos(curval, yscale, y_offs, signal_height);
@@ -810,7 +816,8 @@ impl Chart {
 
             // Digital signal(s)
             let signal_height = if sigtype == SigType::Digital {
-                let mut smpl = datas.get_dig_sampler(idx, sig);
+                let smpl_ref : &mut RefCell<dyn Sampler<bool>> = datas.get_dig_sampler(idx).unwrap();
+                let smpl = smpl_ref.borrow_mut();
                 let signal_height = smpl.get_height();
                 let y_pos = RULE_HEIGHT + height_acc;
                 self.draw_digital(sb, text, width, height, offset, label_height, signal_height, y_pos, smpl);
@@ -818,7 +825,8 @@ impl Chart {
 
             // Analog signal(s)
             } else {
-                let mut smpl = datas.get_ana_sampler(idx, sig);
+                let smpl_ref : &mut RefCell<dyn Sampler<f32>> = datas.get_ana_sampler(idx).unwrap();
+                let mut smpl = smpl_ref.borrow_mut();
                 smpl.set_iter_scale(&self.time_range, &self.time_scale, sig_width);
                 let signal_height = smpl.get_height();
                 let y_pos = RULE_HEIGHT + height_acc;

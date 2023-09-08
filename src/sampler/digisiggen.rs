@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use crate::{Sampler, Time, /*TimeUnit,*/ TimeScale};
+use crate::{Result, Sampler, TimeRel, /*TimeUnit,*/ TimeScale};
 
 #[derive(Debug)]
 enum SigGenType<T> {
@@ -47,16 +47,16 @@ impl Sampler<bool> for DigiSigGen {
         format!("signal_{}", self.sig)
     }
 
-    fn iter_range(&self, range: &[f64; 2]) -> Box<dyn Iterator<Item = (bool, Time)> + '_> {
-        Box::new(DigiSigIter {
+    fn iter_range(&self, range: &[f64; 2]) -> Result<Box<dyn Iterator<Item = (bool, TimeRel)> + '_>> {
+        Ok(Box::new(DigiSigIter {
             smpl: self,
             pos: range[0]-f64::EPSILON,
             range: *range,
             phantom: PhantomData,
-        })
+        }))
     }
 
-    fn get_value_at(&self, t: Time, _s: TimeScale) -> bool {
+    fn get_value_at(&self, t: TimeRel, _s: TimeScale) -> bool {
         match self.stype {
             SigGenType::Fixed(val) => val,
             SigGenType::Clock(period) => t % period < period / 2.,
@@ -70,13 +70,13 @@ impl Sampler<bool> for DigiSigGen {
 
 pub struct DigiSigIter<'r, T> {
     smpl: &'r DigiSigGen,
-    pos: Time,
-    range: [Time; 2],
+    pos: TimeRel,
+    range: [TimeRel; 2],
     phantom: PhantomData<T>,
 }
 
 impl DigiSigIter<'_, bool> {
-    fn next_clock(&mut self, period: f64) -> Option<(bool, Time)> {
+    fn next_clock(&mut self, period: f64) -> Option<(bool, TimeRel)> {
         let half_period = period / 2.;
         let next_pos = self.pos + (half_period - self.pos % half_period);
         if next_pos <= self.range[1] {
@@ -89,7 +89,7 @@ impl DigiSigIter<'_, bool> {
         }
     }
 
-    fn next_pulse(&mut self, start: f64, end: f64, repeat: f64) -> Option<(bool, Time)> {
+    fn next_pulse(&mut self, start: f64, end: f64, repeat: f64) -> Option<(bool, TimeRel)> {
         if self.pos < start {
             self.pos = start;
             Some((true, start))
@@ -114,7 +114,7 @@ impl DigiSigIter<'_, bool> {
 }
 
 impl Iterator for DigiSigIter<'_, bool> {
-    type Item = (bool, Time);
+    type Item = (bool, TimeRel);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.smpl.stype {

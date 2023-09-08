@@ -1,16 +1,16 @@
 use std::marker::PhantomData;
 use std::f64::consts::PI;
-use crate::{Sampler, Time, TimeUnit, TimeScale};
+use crate::{Result, Sampler, TimeRel, TimeUnit, TimeScale};
 
 #[derive(Debug)]
 pub struct SineGen {
     sig: usize,
     height: f32,
     yoffs: f32,
-    period: Time,
+    period: TimeRel,
     scale: TimeScale, // Sampling scale
     phi_delta: f64,
-    time_delta: Time,
+    time_delta: TimeRel,
 }
 
 impl SineGen {
@@ -40,7 +40,7 @@ impl Sampler<f32> for SineGen {
         format!("analog_{}", self.sig)
     }
 
-    fn iter_range(&self, range: &[f64; 2]) -> Box<dyn Iterator<Item = (f32, Time)> + '_> {
+    fn iter_range(&self, range: &[f64; 2]) -> Result<Box<dyn Iterator<Item = (f32, TimeRel)> + '_>> {
         let phi = range[0] / (2. * PI * self.period);
         let iter = Box::new(SineIter {
             smpl: self,
@@ -52,10 +52,10 @@ impl Sampler<f32> for SineGen {
             phantom: PhantomData,
         });
         //println!("iter_range: {:?}", iter);
-        iter
+        Ok(iter)
     }
 
-    fn get_value_at(&self, t: Time, _s: TimeScale) -> f32 {
+    fn get_value_at(&self, t: TimeRel, _s: TimeScale) -> f32 {
         let phi = t / (2. * PI * self.period);
         let val = ((self.yoffs as f64) + (self.height as f64) * f64::sin(phi)) as f32;
         //println!("get_value_at[sine] {:.2} = ..*sin({:.2}) = {:.2}", t, phi, val);
@@ -68,6 +68,7 @@ impl Sampler<f32> for SineGen {
             time: (range[1] - range[0]) * timescale.time / scale_width,
             unit: timescale.unit,
         };
+        //println!("set_iter_scale range:{}-{} timescale:{} scale_width:{}", range[0], range[1], timescale, scale_width);
         self.scale = scale;
         self.time_delta = scale.time;
         self.phi_delta = self.time_delta / (2. * PI * self.period as f64);
@@ -78,15 +79,15 @@ impl Sampler<f32> for SineGen {
 pub struct SineIter<'r, T> {
     smpl: &'r SineGen,
     phi_delta: f64,
-    time_delta: Time,
+    time_delta: TimeRel,
     phi: f64,
-    pos: Time,
-    range: [Time; 2],
+    pos: TimeRel,
+    range: [TimeRel; 2],
     phantom: PhantomData<T>,
 }
 
 impl Iterator for SineIter<'_, f32> {
-    type Item = (f32, Time);
+    type Item = (f32, TimeRel);
 
     fn next(&mut self) -> Option<Self::Item> {
         let next_pos = self.pos + self.time_delta;
@@ -96,7 +97,7 @@ impl Iterator for SineIter<'_, f32> {
             self.pos = next_pos;
             self.phi = next_phi;
             let next_val = (self.smpl.yoffs as f64 + self.smpl.height as f64 * f64::sin(next_phi)) as f32;
-            //let time_scale = TimeScale { time: 1., unit: TimeUnit::Ps };
+            let time_scale = TimeScale { time: 1., unit: TimeUnit::Ps };
             //println!("{:.2} [{:.2}]", next_val, self.smpl.get_value_at(next_pos, time_scale));
             Some((next_val, next_pos))
         } else {

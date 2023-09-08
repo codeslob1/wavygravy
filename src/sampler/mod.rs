@@ -1,14 +1,13 @@
-
+mod digisig;
+pub use digisig::DigiSig;
 mod digisiggen;
 pub use digisiggen::DigiSigGen;
-
 mod sinegen;
 pub use sinegen::SineGen;
-
 mod anasiggen;
 pub use anasiggen::AnaSigGen;
 
-use super::{Time, TimeScale};
+use super::{Result, TimeRel, TimeScale};
 
 pub trait Sampler<T> {
     /// Height to display this signals data (in pixels)
@@ -20,11 +19,11 @@ pub trait Sampler<T> {
     fn get_label(&self) -> String;
 
     //fn iter_range(&self, range: &[f64; 2]) -> impl Iterator<Item = T>;
-    fn iter_range(&self, range: &[f64; 2]) -> Box<dyn Iterator<Item = (T, Time)> + '_>;
+    fn iter_range(&self, range: &[f64; 2]) -> Result<Box<dyn Iterator<Item = (T, TimeRel)> + '_>>;
 
-    fn get_value_at(&self, t: Time, s: TimeScale) -> T;
+    fn get_value_at(&self, t: TimeRel, s: TimeScale) -> T;
 
-    /// Set iteration scale
-    fn set_iter_scale(&mut self, range: &[f64; 2], timescale: &TimeScale, scale_width: f64) { }
+    /// Set iteration scale, used to generate filtered summary waveform
+    fn set_iter_scale(&mut self, _range: &[f64; 2], _timescale: &TimeScale, _scale_width: f64) { }
 }
 
